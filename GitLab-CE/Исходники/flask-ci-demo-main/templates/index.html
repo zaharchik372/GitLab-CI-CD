@@ -1,0 +1,185 @@
+<!-- flask_app/templates/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>GitLab CI/CD • Docker • Flask Deploy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --primary: #0052cc;
+      --accent: #2684ff;
+      --bg: #f4f5f7;
+      --text: #172b4d;
+      --light: #ffffff;
+      --shadow: rgba(9,30,66,0.25);
+      --card-bg: #ffffff;
+      --radius: 12px;
+      --transition: 0.3s ease;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: var(--light);
+      padding: 60px 20px;
+      text-align: center;
+    }
+    header h1 {
+      font-size: 3em;
+      margin-bottom: 10px;
+    }
+    header p {
+      font-size: 1.2em;
+      opacity: 0.9;
+    }
+    main {
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+    .overview {
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: var(--radius);
+      box-shadow: 0 4px 12px var(--shadow);
+      margin-bottom: 40px;
+    }
+    .overview h2 {
+      color: var(--primary);
+      margin-bottom: 15px;
+    }
+    .overview p {
+      margin-bottom: 15px;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin-bottom: 40px;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 4px 10px var(--shadow);
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+    .card h3 {
+      margin-bottom: 10px;
+      color: var(--accent);
+    }
+    .card p {
+      font-size: 0.95em;
+    }
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 12px 24px;
+      background: var(--primary);
+      color: var(--light);
+      text-decoration: none;
+      border-radius: var(--radius);
+      font-weight: bold;
+      transition: background var(--transition);
+    }
+    .btn:hover {
+      background: var(--accent);
+    }
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.9em;
+      color: #6b778c;
+    }
+    @media (max-width: 600px) {
+      header h1 { font-size: 2em; }
+      .overview, .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Автоматизация CI/CD с GitLab & Docker</h1>
+    <p>Демонстрационный деплой Flask-приложения в контейнере с полным пайплайном</p>
+  </header>
+
+  <main>
+    <!-- Описание проекта -->
+    <section class="overview">
+      <h2>О проекте</h2>
+      <p>
+        Этот проект иллюстрирует полный цикл автоматизации: от тестов до продакшн-деплоя. 
+        После каждого пуша в ветку <code>main</code> GitLab CI запускает три стадии:
+      </p>
+      <ul>
+        <li>🔍 <strong>test</strong> — запуск pytest на образе <code>python:3.12</code> и проверка качества кода;</li>
+        <li>🐳 <strong>docker-test</strong> — сборка Docker-контейнера, запуск приложения и проверка HTTP-ответа через curl;</li>
+        <li>🚀 <strong>deploy</strong> — безопасный SSH-деплой на ваш VDS с помощью <code>deploy.sh</code>.</li>
+      </ul>
+      <p>
+        Все зависимости кешируются, чтобы ускорить повторные запуски. Переменные окружения!
+        (<code>VDS_KEY</code>, <code>VDS_HOST</code>, <code>VDS_USER</code>) хранятся в настройках GitLab CI.
+      </p>
+    </section>
+
+    <!-- Карточки стадий -->
+    <section class="cards">
+      <div class="card">
+        <h3>📦 test</h3>
+        <p>
+          • image: <code>python:3.12</code><br>
+          • pip install + pytest<br>
+          • проверка модульных тестов и линтинга
+        </p>
+      </div>
+      <div class="card">
+        <h3>🐳 docker-test</h3>
+        <p>
+          • image: <code>docker:latest</code><br>
+          • сборка <code>docker build -t flask-ci-demo:test .</code><br>
+          • проверка доступности приложения по HTTP
+        </p>
+      </div>
+      <div class="card">
+        <h3>🚀 deploy</h3>
+        <p>
+          • image: <code>alpine:latest</code><br>
+          • SSH-соединение с сервером<br>
+          • <code>git pull && bash deploy.sh</code> на продакшн-окружении
+        </p>
+      </div>
+    </section>
+
+    <!-- Технологии -->
+    <section class="overview">
+      <h2>Технологии</h2>
+      <p>
+        <strong>Backend:</strong> Python 3.12, Flask, Gunicorn + systemd<br>
+        <strong>Web:</strong> Nginx в роли обратного прокси<br>
+        <strong>Контейнеризация:</strong> Docker, Docker Network для изоляции<br>
+        <strong>CI/CD:</strong> GitLab CI/CD, кеширование pip, автоматический деплой
+      </p>
+      <a class="btn" href="https://gitlab.com/ваш_проект/flask-ci-demo" target="_blank">
+        Смотреть репозиторий на GitLab
+      </a>
+    </section>
+  </main>
+
+  <footer>
+    © 2025. Демонстрация DevOps-автоматизации. Все права защищены.
+  </footer>
+
+</body>
+</html>
+

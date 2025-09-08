@@ -1,0 +1,85 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/pip
+
+stages:
+  - test
+  - docker-test
+  - deploy
+
+test:
+  stage: test
+  image: python:3.12
+  tags:
+    - flask
+  before_script:
+    - mkdir -p "$PIP_CACHE_DIR"
+  script:
+    - pip install -r requirements.txt
+    - export PYTHONPATH=$PYTHONPATH:$(pwd)
+    - pytest
+
+docker-test:
+  stage: docker-test
+  image: docker:latest
+  tags:
+    - flask
+  variables:
+    DOCKER_HOST: unix:///var/run/docker.sock
+  before_script:
+    - apk add --no-cache curl bash
+    - docker info
+  script:
+    - echo "Создаём тестовую сеть (если не существует)"
+    - docker network create ci-test-net || true
+    - echo "Удаляем старый контейнер"
+    - docker rm -f flask-test || true
+    - echo "Собираем Docker-образ"
+    - docker build -t flask-ci-demo:test .
+    - echo "Запускаем flask-тест-контейнер в сети ci-test-net"
+    - docker run -d --rm --network ci-test-net --name flask-test flask-ci-demo:test
+    - echo "Ждём запуск"
+    - sleep 5
+    - >
+      echo "Проверка curl через отдельный контейнер" &&
+      docker run --rm --network ci-test-net curlimages/curl:latest curl -f http://flask-test:8080 || (
+        echo "Ошибка: приложение не отвечает" &&
+        docker logs flask-test &&
+        exit 1
+      )
+
+deploy:
+  stage: deploy
+  image: ubuntu:latest
+  tags: [flask]
+  only:
+    - main
+  before_script:
+    - apt-get update -qq && apt-get install -yqq openssh-client dos2unix
+    # --- готовим ~/.ssh ---
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    # если VDS_KEY — File‑variable: cp; если обычная — echo >
+    - cp "$VDS_KEY" ~/.ssh/id_ed25519 || echo "$VDS_KEY" > ~/.ssh/id_ed25519
+    # выпрямляем возможные CRLF
+    - dos2unix ~/.ssh/id_ed25519
+    # гарантируем финальный перевод строки
+    - printf '\n' >> ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    # проверяем, читается ли ключ; упадёт здесь — проблема в ключе
+    - ssh-keygen -l -f ~/.ssh/id_ed25519
+    # known_hosts
+    - ssh-keyscan -H "$VDS_HOST" >> ~/.ssh/known_hosts
+  script:
+    # предварительный пробный коннект с дебагом
+    - ssh -vvv -i ~/.ssh/id_ed25519 "$VDS_USER@$VDS_HOST" true
+    # сам деплой
+    - ssh -i ~/.ssh/id_ed25519 "$VDS_USER@$VDS_HOST" '
+        set -e
+        cd ~/flask-ci-demo
+        git pull --ff-only
+        bash deploy.sh
+      '
